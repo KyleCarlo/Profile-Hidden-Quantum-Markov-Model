@@ -24,7 +24,9 @@ def train_phmm(m, sym_idx, train_seqs, val_seqs=None, test_seqs=None, max_iter=2
     def record(it):
         ll = m.score(X, lengths)
         row = {"iter": it, "cpu_time": cpu, "loglik": ll}
-        for name, seqs in (("val", val_seqs), ("test", test_seqs)):
+        for name, seqs in (("train", train_seqs), ("val", val_seqs), 
+                        #    ("test", test_seqs)
+                           ):
             if seqs:
                 da = description_accuracy(m, sym_idx, seqs)
                 row[f"{name}_da_mean"], row[f"{name}_da_std"] = da.mean(), da.std()

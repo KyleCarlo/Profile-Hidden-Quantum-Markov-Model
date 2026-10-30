@@ -51,14 +51,14 @@ def plot_da_learning_curve(histories, references=None, x="train_time", out="q_da
     fig, ax = plt.subplots(figsize=(7.5, 4.5))
 
     for label, h in histories.items():
-        required = {x, "test_da_mean", "test_da_std"}
+        required = {x, "train_da_mean", "train_da_std"}
         missing = required.difference(h.columns)
         if missing:
             raise ValueError(f"History for {label!r} is missing columns: {sorted(missing)}")
 
         times = h[x].to_numpy(dtype=float)
-        means = h["test_da_mean"].to_numpy(dtype=float)
-        stds = h["test_da_std"].to_numpy(dtype=float)
+        means = h["train_da_mean"].to_numpy(dtype=float)
+        stds = h["train_da_std"].to_numpy(dtype=float)
 
         (line,) = ax.plot(
             times, means,

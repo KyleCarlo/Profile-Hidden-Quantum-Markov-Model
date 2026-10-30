@@ -12,7 +12,7 @@ def init_transition_mat(match_len):
     # INITIALIZE THE PROBABILITIES
     trans_matdf = pd.DataFrame(0, columns=COLS, index=COLS, dtype=np.float64)
     
-    # Starting values: my own assumptions, not from a reference. Tune them.
+    # Starting values: based on assumptions
     T_MM, T_MI, T_MD = 0.90, 0.05, 0.05      # from an internal Match state
     T_IM, T_II       = 0.50, 0.50            # from an internal Insert state
     T_DM, T_DD       = 0.90, 0.10            # from a Delete state

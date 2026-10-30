@@ -6,21 +6,28 @@ def _references(ax, references):
     for i, (label, value) in enumerate((references or {}).items()):
         ax.axhline(value, ls=["--", ":", "-."][i % 3], color="0.25", lw=1.2, label=label, zorder=1)
 
+
 def description_accuracy(m, sym_idx, seqs):
-    """Per-sequence DA; the paper reports the mean and the std across sequences."""
+    """Per-sequence PHMM description accuracy."""
+
     da = np.empty(len(seqs))
-    s = 22  # number of symbols in the residues, including '^' and '$'
+    s = 21  # 20 amino acids + terminal '$'
+
     for i, seq in enumerate(seqs):
         X, _ = encode_sequences(sym_idx, [seq])
 
         try:
-            ln_p = m.score(X)                  # natural-log P('^' + s + '$')
-        except ValueError:                   # zero-probability sequence ('scaling' raises)
+            # PHMM processes ^ + amino acids + $
+            ln_p = m.score(X)
+        except ValueError:
             ln_p = -np.inf
-        ls_p = ln_p / np.log(s)             # base conversion ln_p -> ls_p
-        
-        x = 1.0 + ls_p / len(seq)  # DA = 1 + log_s P / L   
+
+        # Exclude the deterministic initial ^ from DA length
+        length = len(X) - 1
+
+        x = 1.0 + ln_p / (length * np.log(s))
         da[i] = x if x > 0 else np.tanh(x / 8.0)
+
     return da
 
 def _references(ax, references):
@@ -33,9 +40,9 @@ def plot_da_learning_curve(histories, references=None, x="cpu_time", out="da_vs_
     test sequences and the band is +/- 1 std across test sequences."""
     fig, ax = plt.subplots(figsize=(7, 4.2))
     for label, h in histories.items():
-        (line,) = ax.plot(h[x], h["test_da_mean"], marker="o", ms=3, lw=1.8, label=label)
-        ax.fill_between(h[x], h["test_da_mean"] - h["test_da_std"],
-                        h["test_da_mean"] + h["test_da_std"], color=line.get_color(), alpha=0.18)
+        (line,) = ax.plot(h[x], h["train_da_mean"], marker="o", ms=3, lw=1.8, label=label)
+        ax.fill_between(h[x], h["train_da_mean"] - h["train_da_std"],
+                        h["train_da_mean"] + h["train_da_std"], color=line.get_color(), alpha=0.18)
     _references(ax, references)
     ax.set_xlabel("CPU time (s)" if x == "cpu_time" else "EM iteration")
     ax.set_ylabel("Test DA")

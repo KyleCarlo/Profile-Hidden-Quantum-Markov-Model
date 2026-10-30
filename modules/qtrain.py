@@ -119,7 +119,9 @@ def train_hqmm(
                 "loglik": ll,
             }
 
-            for name, seqs in (("val", val_seqs), ("test", test_seqs)):
+            for name, seqs in (("train", train_seqs), ("val", val_seqs), 
+                            #    ("test", test_seqs)
+                               ):
                 if seqs is not None and len(seqs) > 0:
                     da = description_accuracy_hqmm(
                         p, K, W, sym_idx, seqs, validate_probs=False

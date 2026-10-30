@@ -75,35 +75,46 @@ def loss_function(p, K, W, seq, *, validate_probs=True):
     return -loglik
 
 
-def description_accuracy_hqmm(p, K, W, sym_idx, seqs, *,
-                              validate_probs=True):
-    """Return per-sequence description accuracy as a real PyTorch tensor.
 
-    Output stays on p.device (CUDA if p is on CUDA), with p.real.dtype.
-    No per-sequence .item(), NumPy statistics, or CPU tensor assignments.
+def description_accuracy_hqmm(
+    p, K, W, sym_idx, seqs, *,
+    validate_probs=True
+):
+    """Per-sequence HQMM description accuracy."""
 
-    The alphabet size 21 is retained from the original implementation.
-    """
-    s = 21  # Number of modeled symbols, excluding the initial '^'
+    s = 21
     log_s = math.log(s)
     scores = []
 
     with torch.no_grad():
         for i, seq in enumerate(seqs):
             X, _ = encode_sequences(sym_idx, [seq])
+
+            # Exclude ^, but retain terminal $
             encoded = X.reshape(-1)[1:]
 
             if len(encoded) == 0:
                 raise ValueError(
-                    f"Sequence {i} has no observations after ^."
+                    f"Sequence {i} has no modeled observations."
                 )
 
             neg_logp = loss_function(
-                p, K, W, encoded, validate_probs=validate_probs
+                p, K, W, encoded,
+                validate_probs=validate_probs
             )
-            x = 1.0 - neg_logp / (len(encoded) * log_s)
-            scores.append(torch.where(x > 0, x, torch.tanh(x / 8.0)))
+
+            x = 1.0 - neg_logp / (
+                len(encoded) * log_s
+            )
+
+            scores.append(
+                torch.where(x > 0, x, torch.tanh(x / 8.0))
+            )
 
     if not scores:
-        return torch.empty(0, dtype=p.real.dtype, device=p.device)
+        return torch.empty(
+            0, dtype=p.real.dtype, device=p.device
+        )
+
     return torch.stack(scores)
+
