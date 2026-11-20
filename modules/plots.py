@@ -8,8 +8,12 @@ def _style_axes(ax):
     ax.set_axisbelow(True)
     ax.grid(True, color="#b0b0b0", alpha=0.25, linewidth=1)
 
+    # Full rectangular border around the plot
+    ax.set_frame_on(True)
     for spine in ax.spines.values():
-        spine.set_linewidth(1.0)
+        spine.set_visible(True)
+        spine.set_color("#404040")
+        spine.set_linewidth(1.2)
 
     ax.tick_params(axis="both", labelsize=11, width=1, length=5)
 

@@ -29,6 +29,72 @@ def build_hqmm(trans_matdf, emit_matdf):
     K = kraus_operators(trans_mat, emit_matdf.to_numpy())
     return K
 
+def initialize_random_hqmm(n, s, w, device="cpu"):
+    """
+    Random complex HQMM initialization for arbitrary w.
+
+    Parameters
+    ----------
+    n : int
+        Hidden-state dimension.
+
+    s : int
+        Number of modeled observable symbols,
+        excluding the start symbol (^).
+
+    w : int
+        Number of Kraus operators per symbol.
+
+    device : str
+        Device for tensor allocation.
+
+    Returns
+    -------
+    p : torch.Tensor
+        Random Hermitian PSD density matrix.
+
+    K : dict
+        Kraus operators indexed by (w, symbol).
+
+        Symbol indices run from 1 to s.
+        Index 0 is reserved for ^ and excluded.
+    """
+
+    # Random complex matrix
+    shape = (n * s * w, n)
+
+    Z = (
+        torch.randn(shape, device=device)
+        + 1j * torch.randn(shape, device=device)
+    ).to(torch.complex64)
+
+    # Orthonormalize columns (Stiefel manifold)
+    kappa, _ = torch.linalg.qr(Z, mode="reduced")
+
+    # Partition into n x n Kraus operators
+    K = {}
+
+    for y in range(s):
+        symbol_idx = y + 1  # Skip ^ (index 0)
+
+        for j in range(w):
+            index = y * w + j
+
+            K[(j, symbol_idx)] = kappa[
+                index * n:(index + 1) * n, :
+            ].clone()
+
+    # Random Hermitian PSD initial density matrix
+    G = (
+        torch.randn((n, n), device=device)
+        + 1j * torch.randn((n, n), device=device)
+    ).to(torch.complex64)
+
+    p = G @ G.conj().T
+    p = p / torch.trace(p).real
+
+    return p, K
+
 def convert_to_torch(K):
     K_torch = {
         key: torch.tensor(
