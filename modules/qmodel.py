@@ -95,6 +95,112 @@ def initialize_random_hqmm(n, s, w, device="cpu"):
 
     return p, K
 
+def compress_phmm_kraus(
+    K_phmm,
+    n,
+    W,
+    device="cpu",
+    seed=2
+):
+    """
+    Create a Plan7-informed HQMM with W Kraus
+    operators per observation.
+
+    K_phmm:
+        Original PHMM-derived Kraus dictionary
+        indexed by (j, symbol), with j=0,...,n-1.
+
+    Returns:
+        A valid complex-valued Kraus dictionary
+        indexed by (w, symbol), with w=0,...,W-1.
+
+    For W < n, the original PHMM probabilities and
+    structural zeros are not guaranteed to be preserved.
+    """
+
+    if not 1 <= W <= n:
+        raise ValueError("W must satisfy 1 <= W <= n")
+
+    dtype = torch.complex128
+    real_dtype = torch.float64
+
+    symbol_ids = sorted({y for _, y in K_phmm})
+
+    generator = torch.Generator(device=device)
+    generator.manual_seed(seed)
+
+    # Random complex mixing matrix
+    Z = torch.complex(
+        torch.randn(
+            (n, W), dtype=real_dtype,
+            device=device, generator=generator
+        ),
+        torch.randn(
+            (n, W), dtype=real_dtype,
+            device=device, generator=generator
+        )
+    )
+
+    # Orthonormal rows: Q @ Q^dagger = I_W
+    Q_col, _ = torch.linalg.qr(Z, mode="reduced")
+    Q = Q_col.conj().T
+
+    K_new = {}
+
+    # Mix the original HMM-derived Kraus operators
+    for y in symbol_ids:
+
+        # Recover square-root observable operator
+        sqrt_T = torch.stack(
+            [
+                torch.as_tensor(
+                    K_phmm[(j, y)][:, j],
+                    dtype=dtype,
+                    device=device
+                )
+                for j in range(n)
+            ],
+            dim=1
+        )
+
+        for j in range(W):
+            K_new[(j, y)] = (
+                sqrt_T * Q[j, :].unsqueeze(0)
+            )
+
+    # Restore Kraus completeness
+    S = torch.zeros(
+        (n, n), dtype=dtype, device=device
+    )
+
+    for A in K_new.values():
+        S += A.conj().T @ A
+
+    S = (S + S.conj().T) / 2
+
+    eigvals, eigvecs = torch.linalg.eigh(S)
+
+    if eigvals.min().item() <= 1e-12:
+        raise ValueError(
+            "Compression produced a singular normalization "
+            "matrix. Try another seed or a larger W."
+        )
+
+    S_inv_sqrt = (
+        eigvecs
+        @ torch.diag(eigvals.rsqrt()).to(dtype)
+        @ eigvecs.conj().T
+    )
+
+    K_new = {
+        key: (A @ S_inv_sqrt)
+            .to(torch.complex64)
+            .detach()
+        for key, A in K_new.items()
+    }
+
+    return K_new
+
 def convert_to_torch(K):
     K_torch = {
         key: torch.tensor(
