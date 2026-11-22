@@ -121,15 +121,18 @@ def compress_phmm_kraus(
     if not 1 <= W <= n:
         raise ValueError("W must satisfy 1 <= W <= n")
 
+    # numerical precision
     dtype = torch.complex128
     real_dtype = torch.float64
 
+    # extracts the unique observation indices, 1-21
     symbol_ids = sorted({y for _, y in K_phmm})
 
+    # creates an independent random number generator and initializes with seed
     generator = torch.Generator(device=device)
     generator.manual_seed(seed)
 
-    # Random complex mixing matrix
+    # Random complex mixing matrix Z = A+iB
     Z = torch.complex(
         torch.randn(
             (n, W), dtype=real_dtype,
@@ -141,8 +144,12 @@ def compress_phmm_kraus(
         )
     )
 
+    # Z is not orthoganal, so we use QR decomposition
     # Orthonormal rows: Q @ Q^dagger = I_W
     Q_col, _ = torch.linalg.qr(Z, mode="reduced")
+    # dagger to change the shape (less rows, more columns)
+    # rows = W
+    # columns = n
     Q = Q_col.conj().T
 
     K_new = {}
@@ -150,7 +157,7 @@ def compress_phmm_kraus(
     # Mix the original HMM-derived Kraus operators
     for y in symbol_ids:
 
-        # Recover square-root observable operator
+        # Recover the elementwise square-root observable operator for symbol y.
         sqrt_T = torch.stack(
             [
                 torch.as_tensor(
@@ -163,6 +170,13 @@ def compress_phmm_kraus(
             dim=1
         )
 
+        # Generate W compressed Kraus operators by scaling each column of sqrt_T
+        # using the corresponding entries in row j of the mixing matrix Q.
+        #
+        # Kbar_(j,y) = sqrt_T_y @ diag(Q[j, :])
+        #
+        # Note: The compressed operators still require Kraus
+        # completeness normalization afterward.
         for j in range(W):
             K_new[(j, y)] = (
                 sqrt_T * Q[j, :].unsqueeze(0)
