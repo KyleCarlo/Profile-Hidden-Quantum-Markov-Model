@@ -17,6 +17,24 @@ def split_train_val_test(records, train_fraction=0.7, val_fraction=0.1, seed=42)
     test  = [s for _, s in records[n_train_val:]]
     return train, val, test
 
+def remove_unknown_amino_acids(seqs):
+    amino_acids = set([
+        "A", "C", "D", "E", "F",
+        "G", "H", "I", "K", "L",
+        "M", "N", "P", "Q", "R",
+        "S", "T", "V", "W", "Y"
+    ])
+
+    remove_count = 0
+    new_seqs = []
+    for seq in seqs:
+        if set(seq).issubset(amino_acids):
+            new_seqs.append(seq)
+        else:
+            remove_count += 1
+
+    return remove_count, new_seqs
+
 def encode_sequences(sym_idx, seqs):
     """Strings -> hmmlearn input. Wraps each sequence as '^' + seq + '$', so every path
     has to start in M0 and end in M150."""
